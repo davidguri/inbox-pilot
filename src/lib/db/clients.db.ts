@@ -1,5 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_KEY } from '$env/static/private';
+import { supabase } from '../../supabase/supabase';
 
 export type ClientInput = {
   name?: string | null;
@@ -16,8 +15,6 @@ export type ClientRow = {
   company: string | null;
 };
 
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
-
 function toE164(raw?: string | null) {
   if (!raw) return null;
   const digits = raw.replace(/[^\d]/g, '');
@@ -32,16 +29,16 @@ export async function upsertClient(input: ClientInput): Promise<ClientRow> {
   const company = input.company?.trim() || null;
 
   if (email) {
-    const { data } = await sb.from('clients').select('*').eq('email', email).maybeSingle();
+    const { data } = await supabase.from('clients').select('*').eq('email', email).maybeSingle();
     if (data) return data as ClientRow;
   }
 
   if (phone) {
-    const { data } = await sb.from('clients').select('*').eq('phone', phone).maybeSingle();
+    const { data } = await supabase.from('clients').select('*').eq('phone', phone).maybeSingle();
     if (data) return data as ClientRow;
   }
 
-  const { data: inserted, error } = await sb
+  const { data: inserted, error } = await supabase
     .from('clients')
     .insert({ name, email, phone, company })
     .select('*')
@@ -52,14 +49,14 @@ export async function upsertClient(input: ClientInput): Promise<ClientRow> {
 }
 
 export async function linkLeadToClient(leadId: string, clientId: string) {
-  const { error } = await sb.from('leads').update({ client_id: clientId }).eq('id', leadId);
+  const { error } = await supabase.from('leads').update({ client_id: clientId }).eq('id', leadId);
   if (error) throw new Error(error.message);
 }
 
 export async function resolveAndLinkLead(leadId: string, input: ClientInput) {
   const client = await upsertClient(input);
   await linkLeadToClient(leadId, client.id);
-  const { data: lead } = await sb
+  const { data: lead } = await supabase
     .from('leads')
     .select('id, source, raw_text, intent, urgency, client_id, created_at')
     .eq('id', leadId)
