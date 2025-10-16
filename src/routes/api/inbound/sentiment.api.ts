@@ -1,13 +1,13 @@
 import { supabase } from '../../../supabase/supabase';
 import { hf } from "./hf.api";
 
-enum Urgency {
+export enum Urgency {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high'
 }
 
-enum Sentiment {
+export enum Sentiment {
   NEGATIVE = 'negative',
   NEUTRAL = 'neutral',
   POSITIVE = 'positive'
