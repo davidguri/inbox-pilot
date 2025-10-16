@@ -9,9 +9,9 @@ type LeadCtx = {
   client_id: string | null;
   subject: string | null;
   raw_text: string;
-  intent: Labels;
-  urgency: Urgency;
-  sentiment: Sentiment;
+  intent: Labels | null;
+  urgency: Urgency | null;
+  sentiment: Sentiment | null;
   org_name: string;
   client_name: string | null;
 };
@@ -50,9 +50,9 @@ async function fetchLeadContext(leadId: string): Promise<LeadCtx> {
     client_id: lead.client_id,
     subject: lead.subject,
     raw_text: lead.raw_text ?? '',
-    intent: lead.intent,
-    urgency: lead.urgency,
-    sentiment: lead.sentiment,
+    intent: (lead.intent as Labels) ?? null,
+    urgency: (lead.urgency as Urgency) ?? null,
+    sentiment: (lead.sentiment as Sentiment) ?? null,
     org_name: org.name,
     client_name
   };
@@ -60,11 +60,11 @@ async function fetchLeadContext(leadId: string): Promise<LeadCtx> {
 
 function buildReplyPrompt(ctx: LeadCtx) {
   const system = `
-You draft short, professional email replies in the same language as the original message (auto-detect).
+You draft short, professional email replies in the SAME language as the original message (auto-detect).
 Rules:
 - Max ~120 words, plain text (no markdown).
 - If intent is "spam", output exactly: [NO_REPLY_SPAM]
-- If intent is "support": ask for ONE clarifying detail (if needed) max and propose the next step.
+- If intent is "support": ask for ONE clarifying detail max and propose the next step.
 - If intent is "sales": summarize the ask, propose 1–2 concrete next steps, ask for quick confirmation.
 - Be polite, clear, and actionable.
 - End with a signoff using the organization name.
@@ -74,7 +74,9 @@ Rules:
     ctx.intent ? `Intent: ${ctx.intent}` : null,
     ctx.urgency ? `Urgency: ${ctx.urgency}` : null,
     ctx.sentiment ? `Sentiment: ${ctx.sentiment}` : null
-  ].filter(Boolean).join(' • ');
+  ]
+    .filter(Boolean)
+    .join(' • ');
 
   const prompt = `
 ${meta || 'Intent: n/a'}
@@ -92,26 +94,52 @@ Draft the full reply (with greeting and signoff). Plain text only.
   return { system, prompt };
 }
 
+// Call a *generation* model (NOT a classifier). Single model, no candidates.
 async function callModel(system: string, prompt: string): Promise<string> {
-  const model = 'Qwen/Qwen2.5-7B-Instruct';
+  const inputs = `${system}\n\nUser:\n${prompt}\nAssistant:`;
 
-  const res = await hf(model, {
-    inputs: `${system}\n\nUser:\n${prompt}\nAssistant:`,
-    parameters: { max_new_tokens: 220, temperature: 0.3, top_p: 0.9, repetition_penalty: 1.05 }
+  const res = await hf('TinyLlama/TinyLlama-1.1B-Chat-v1.0', {
+    inputs,
+    parameters: { max_new_tokens: 220, temperature: 0.3, top_p: 0.9, repetition_penalty: 1.05 },
+    options: { wait_for_model: true }
   }) as any;
 
+  // HF returns a few shapes depending on pipeline:
+  // - [{ generated_text: "..." }]
+  // - { generated_text: "..." }
+  // - "..." (rare)
   const raw =
-    typeof res === 'string' ? res :
-      (res?.generated_text || res?.[0]?.generated_text || '');
+    (Array.isArray(res) && res[0]?.generated_text) ||
+    res?.generated_text ||
+    (typeof res === 'string' ? res : '');
 
-  const body = raw?.toString().replace(/^assistant:\s*/i, '').trim() || '';
+  const body = (raw || '').toString().replace(/^assistant:\s*/i, '').trim();
+  if (!body) throw new Error(`Empty generation from model 'TinyLlama/TinyLlama-1.1B-Chat-v1.0'`);
+
   return /\[NO_REPLY_SPAM\]/i.test(body) ? '[NO_REPLY_SPAM]' : body;
+}
+
+export async function generateReplyBodyForLead(leadId: string): Promise<string> {
+  const ctx = await fetchLeadContext(leadId);
+
+  // Hard stop for spam to avoid unnecessary HF calls
+  if (ctx.intent === 'spam') return '[NO_REPLY_SPAM]';
+
+  const { system, prompt } = buildReplyPrompt(ctx);
+  return await callModel(system, prompt);
 }
 
 export async function createReplyDraftForLead(leadId: string) {
   const ctx = await fetchLeadContext(leadId);
-  const { system, prompt } = buildReplyPrompt(ctx);
-  const body = await callModel(system, prompt);
+
+  // Hard stop for spam
+  const body =
+    ctx.intent === 'spam'
+      ? '[NO_REPLY_SPAM]'
+      : await (async () => {
+        const { system, prompt } = buildReplyPrompt(ctx);
+        return await callModel(system, prompt);
+      })();
 
   const { data, error } = await supabase
     .from('drafts')

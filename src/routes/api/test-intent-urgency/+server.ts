@@ -1,76 +1,80 @@
-// src/routes/api/test-intent-urgency/+server.ts
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_KEY } from '$env/static/private';
 
-// ⬇️ Use your existing classifiers (adjust import paths if needed)
+import { supabase } from '../../../supabase/supabase';
 import { classifyIntent } from '../inbound/classify.api';
 import { classifyUrgencyFull } from '../inbound/sentiment.api';
 
-// Server-only Supabase client (service role bypasses RLS for this test route)
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
-
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const body = await request.json().catch(() => ({}));
-    const text = String(body.text ?? '');
-    const source = String(body.source ?? 'web');
+    const body = await request.json().catch(() => ({} as any));
+    const text = String(body.text ?? '').trim();
+    const leadId = body.leadId ? String(body.leadId) : '';
+    const org_id = body.org_id ? String(body.org_id) : ''; // REQUIRED when leadId is absent
 
-    if (!text.trim()) {
-      return json({ ok: false, error: 'Provide { "text": "...", source?: "web|email|whatsapp" }' }, { status: 400 });
+    if (!text) {
+      return json({ ok: false, error: 'Provide { "text": "...", leadId?: "uuid", org_id?: "uuid" }' }, { status: 400 });
     }
 
-    // 1) Create a new lead
-    const { data: inserted, error: insErr } = await sb
-      .from('leads')
-      .insert({ source, raw_text: text })
-      .select('id, created_at')
-      .single();
+    // If no leadId, we create a temp lead (requires org_id)
+    let effectiveLeadId = leadId;
+    if (!effectiveLeadId) {
+      if (!org_id) {
+        return json({ ok: false, error: 'org_id is required when leadId is not provided' }, { status: 400 });
+      }
 
-    if (insErr || !inserted) throw new Error(`Insert failed: ${insErr?.message ?? 'no row returned'}`);
+      // (Optional) sanity check org exists
+      const { data: org, error: orgErr } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('id', org_id)
+        .maybeSingle();
+      if (orgErr) throw new Error(`organizations.select: ${orgErr.message}`);
+      if (!org) return json({ ok: false, error: 'organization not found' }, { status: 404 });
 
-    const leadId = inserted.id as string;
+      // Create a minimal lead carrying org_id so NOT NULL passes
+      const { data: ins, error: insErr } = await supabase
+        .from('leads')
+        .insert({
+          org_id,
+          client_id: null,
+          source: 'manual',
+          external_id: null,
+          subject: 'Test (intent/urgency)',
+          raw_text: text
+        })
+        .select('id')
+        .single();
+      if (insErr) throw new Error(`leads.insert: ${insErr.message}`);
+      effectiveLeadId = ins!.id;
+    }
 
-    // 2) Run AI in parallel
-    const [intent, urg] = await Promise.all([
-      classifyIntent(text),
-      classifyUrgencyFull(text) // { urgency, score, reasons, sentiment }
-    ]);
+    // Run classifications
+    const intent = await classifyIntent(text) as 'sales' | 'support' | 'spam';
+    const u = await classifyUrgencyFull(text); // { urgency, score, reasons, sentiment }
 
-    // 3) Update the lead with AI results
-    const { error: updErr } = await sb
+    // Persist tags to the lead
+    const { error: updErr } = await supabase
       .from('leads')
       .update({
         intent,
-        urgency: urg.urgency,
-        urgency_score: urg.score,
-        urgency_reasons: urg.reasons,
-        sentiment: urg.sentiment
+        urgency: u.urgency,
+        urgency_score: u.score,
+        urgency_reasons: u.reasons,
+        sentiment: u.sentiment
       })
-      .eq('id', leadId);
+      .eq('id', effectiveLeadId);
+    if (updErr) throw new Error(`leads.update(tags): ${updErr.message}`);
 
-    if (updErr) throw new Error(`Update failed: ${updErr.message}`);
-
-    // 4) Read back the final row
-    const { data: finalRow, error: selErr } = await sb
-      .from('leads')
-      .select('id, source, raw_text, intent, urgency, urgency_score, urgency_reasons, sentiment, created_at')
-      .eq('id', leadId)
-      .single();
-
-    if (selErr) throw new Error(`Select failed: ${selErr.message}`);
-
+    // Return both the intent and the updated lead id
     return json({
       ok: true,
-      leadId,
-      input_preview: text.slice(0, 160),
+      lead_id: effectiveLeadId,
       intent,
-      urgency: urg.urgency,
-      urgency_score: urg.score,
-      urgency_reasons: urg.reasons,
-      sentiment: urg.sentiment,
-      row: finalRow
+      urgency: u.urgency,
+      urgency_score: u.score,
+      urgency_reasons: u.reasons,
+      sentiment: u.sentiment
     });
   } catch (e: any) {
     console.error('[test-intent-urgency] ERROR:', e);
