@@ -1,4 +1,4 @@
-import { supabase } from '../../../supabase/supabase';
+import { supabase } from '../../supabase/supabase';
 import { hf } from './hf.api';
 
 export enum Labels {
@@ -13,6 +13,7 @@ const SUPPORT_HINTS_EN = [
   'bug', 'issue', 'error', '500', 'crash', 'fails', 'down', 'not working', 'problem',
   'refund', 'warranty', 'help', 'support', 'fix', 'debug', 'cannot', 'can’t', 'can\'t'
 ];
+
 const SUPPORT_HINTS_SQ = [
   'gabim', 'problem', 'defekt', 'ndahet', 'nuk punon', 'jo funksionon', 'ndihmë', 'ndihme',
   'mbështetje', 'support', 'rimbursim', 'faturë nuk', 'nuk mund', 's’punon', 'spunon'
@@ -22,6 +23,7 @@ const SPAM_HINTS = [
   'click here', 'make $', 'win $', 'crypto', 'bitcoin', 'pump', 'investment opportunity',
   'adult', 'xxx', 'viagra', 'loan approval', 'betting', 'casino', 'airdrop', 'bonus'
 ];
+
 const SPAM_RE = /\b(?:\$?\d{3,}\s*(?:per\s*(?:day|week)|\/\s*(?:day|week))|https?:\/\/\S+|wa\.me\/\d+|\+\d{7,}|telegram|t\.me\/\S+)\b/i;
 
 function hasAny(hay: string, needles: string[]) {

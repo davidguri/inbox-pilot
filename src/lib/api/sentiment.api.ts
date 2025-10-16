@@ -1,4 +1,4 @@
-import { supabase } from '../../../supabase/supabase';
+import { supabase } from '../../supabase/supabase';
 import { hf } from "./hf.api";
 
 export enum Urgency {

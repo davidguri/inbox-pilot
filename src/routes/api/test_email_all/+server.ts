@@ -5,8 +5,8 @@ import { json } from '@sveltejs/kit';
 import { supabase } from '../../../supabase/supabase';
 
 // Reuse your existing helpers (paths match what you shared earlier)
-import { classifyIntent } from '../inbound/classify.api';
-import { classifyUrgencyFull } from '../inbound/sentiment.api';
+import { classifyIntent } from '../../../lib/api/classify.api';
+import { classifyUrgencyFull } from '../../../lib/api/sentiment.api';
 import { createReplyDraftForLead } from '../../../lib/drafts/reply.draft';
 
 type Body = {

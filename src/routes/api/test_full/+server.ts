@@ -3,8 +3,8 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 
 import { supabase } from '../../../supabase/supabase'; // uses your existing client
-import { classifyIntent } from '../inbound/classify.api';      // ⬅ adjust path if needed
-import { classifyUrgencyFull } from '../inbound/sentiment.api'; // ⬅ adjust path if needed
+import { classifyIntent } from '../../../lib/api/classify.api';      // ⬅ adjust path if needed
+import { classifyUrgencyFull } from '../../../lib/api/sentiment.api'; // ⬅ adjust path if needed
 
 type Contact = { name?: string | null; email?: string | null; phone?: string | null; company?: string | null };
 type Body = {

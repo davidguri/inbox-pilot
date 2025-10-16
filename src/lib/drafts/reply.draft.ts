@@ -1,7 +1,7 @@
 import { supabase } from '../../supabase/supabase';
-import { hf } from '../../routes/api/inbound/hf.api';
-import { Labels } from '../../routes/api/inbound/classify.api';
-import { Urgency, Sentiment } from '../../routes/api/inbound/sentiment.api';
+import { hf } from '../api/hf.api';
+import { Labels } from '../api/classify.api';
+import { Urgency, Sentiment } from '../api/sentiment.api';
 
 type LeadCtx = {
   id: string;

@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_KEY } from '$env/static/private';
 
 // your existing classifiers (adjust paths)
-import { classifyIntent } from '../inbound/classify.api';
-import { classifyUrgencyFull } from '../inbound/sentiment.api';
+import { classifyIntent } from '../../../lib/api/classify.api';
+import { classifyUrgencyFull } from '../../../lib/api/sentiment.api';
 import { resolveAndLinkLead } from '../../../lib/db/clients.db';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });

@@ -2,8 +2,8 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { supabase } from '../../../../supabase/supabase';
-import { classifyIntent } from '../../inbound/classify.api';
-import { classifyUrgencyFull } from '../../inbound/sentiment.api';
+import { classifyIntent } from '../../../../lib/api/classify.api';
+import { classifyUrgencyFull } from '../../../../lib/api/sentiment.api';
 import { normEmail } from '$lib/utils/normalize.util';
 
 type InboundContact = {
