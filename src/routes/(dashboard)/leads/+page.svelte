@@ -46,11 +46,27 @@
 
 	function getIntentColor(intent: string) {
 		const intentLower = intent?.toLowerCase() || 'unknown';
-		if (intentLower.includes('claim')) return 'text-blue-400 bg-blue-500/10';
-		if (intentLower.includes('question')) return 'text-purple-400 bg-purple-500/10';
-		if (intentLower.includes('inquiry')) return 'text-cyan-400 bg-cyan-500/10';
-		if (intentLower.includes('complaint')) return 'text-red-400 bg-red-500/10';
-		return 'text-gray-400 bg-gray-500/10';
+		if (intentLower.includes('claim')) return 'text-blue-400 bg-blue-500/10 border-blue-500/30';
+		if (intentLower.includes('question')) return 'text-purple-400 bg-purple-500/10 border-purple-500/30';
+		if (intentLower.includes('inquiry')) return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30';
+		if (intentLower.includes('complaint')) return 'text-red-400 bg-red-500/10 border-red-500/30';
+		return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
+	}
+
+	function getSentimentColor(sentiment: string) {
+		const sentimentLower = sentiment?.toLowerCase() || 'neutral';
+		if (sentimentLower.includes('positive')) return 'text-green-400 bg-green-500/10 border-green-500/30';
+		if (sentimentLower.includes('negative')) return 'text-red-400 bg-red-500/10 border-red-500/30';
+		if (sentimentLower.includes('neutral')) return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
+		return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
+	}
+
+	function getUrgencyColor(urgency: string) {
+		const urgencyLower = urgency?.toLowerCase() || 'low';
+		if (urgencyLower.includes('high') || urgencyLower.includes('critical')) return 'text-red-400 bg-red-500/10 border-red-500/30';
+		if (urgencyLower.includes('medium') || urgencyLower.includes('moderate')) return 'text-orange-400 bg-orange-500/10 border-orange-500/30';
+		if (urgencyLower.includes('low')) return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30';
+		return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
 	}
 
 	// Only reload when orgId changes
@@ -240,6 +256,74 @@
 							<div class="mt-1 line-clamp-2 text-xs text-gray-400">
 								{lead.raw_text?.slice(0, 150) || 'No content'}...
 							</div>
+							
+							<!-- AI Analysis Chips -->
+							<div class="mt-2 flex flex-wrap items-center gap-1.5">
+								{#if lead.intent}
+									<span
+										class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium capitalize {getIntentColor(
+											lead.intent
+										)}"
+										title="Intent"
+									>
+										<svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+											<path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+										</svg>
+										{lead.intent}
+									</span>
+								{/if}
+								
+								{#if lead.sentiment}
+									<span
+										class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium capitalize {getSentimentColor(
+											lead.sentiment
+										)}"
+										title="Sentiment"
+									>
+										<svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+											<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.415 0 3 3 0 014.242 0 1 1 0 001.415-1.415 5 5 0 00-7.072 0 1 1 0 000 1.415z" clip-rule="evenodd" />
+										</svg>
+										{lead.sentiment}
+									</span>
+								{/if}
+								
+								{#if lead.urgency}
+									<span
+										class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium capitalize {getUrgencyColor(
+											lead.urgency
+										)}"
+										title="Urgency{lead.urgency_score ? ` (Score: ${lead.urgency_score})` : ''}"
+									>
+										<svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+											<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+										</svg>
+										{lead.urgency}
+										{#if lead.urgency_score}
+											<span class="ml-1 opacity-70">({lead.urgency_score})</span>
+										{/if}
+									</span>
+								{/if}
+								
+								{#if lead.urgency_reasons && lead.urgency_reasons.length > 0}
+									{#each lead.urgency_reasons.slice(0, 3) as reason}
+										<span
+											class="inline-flex items-center rounded-md border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-xs text-purple-300"
+											title="Urgency Reason"
+										>
+											{reason}
+										</span>
+									{/each}
+									{#if lead.urgency_reasons.length > 3}
+										<span
+											class="inline-flex items-center rounded-md border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-xs text-purple-300"
+											title="{lead.urgency_reasons.slice(3).join(', ')}"
+										>
+											+{lead.urgency_reasons.length - 3} more
+										</span>
+									{/if}
+								{/if}
+							</div>
+							
 							<div class="mt-2 flex items-center space-x-2 text-xs text-gray-500">
 								<span>{new Date(lead.created_at).toLocaleDateString()}</span>
 								{#if lead.email}
@@ -247,17 +331,6 @@
 									<span class="truncate">{lead.email}</span>
 								{/if}
 							</div>
-						</div>
-						<div class="flex-shrink-0">
-							{#if lead.intent}
-								<span
-									class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium capitalize {getIntentColor(
-										lead.intent
-									)}"
-								>
-									{lead.intent}
-								</span>
-							{/if}
 						</div>
 					</div>
 				{/each}
