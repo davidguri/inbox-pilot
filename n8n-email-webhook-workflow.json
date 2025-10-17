@@ -1,0 +1,211 @@
+{
+  "name": "Inbox Pilot - Email Webhook (Alternative)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "inbox-pilot-email",
+        "responseMode": "responseNode",
+        "options": {
+          "noResponseBody": false
+        }
+      },
+      "id": "webhook-trigger-001",
+      "name": "Webhook - Incoming Email",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "inbox-pilot-email-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse incoming webhook data from email service\n// Supports: SendGrid, Mailgun, Postmark, CloudMailin, etc.\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const body = item.json.body || item.json;\n  \n  let fromEmail = '';\n  let fromName = '';\n  let subject = '';\n  let text = '';\n  let html = '';\n  let messageId = '';\n  let to = '';\n  \n  // SendGrid format\n  if (body.from || body.to) {\n    fromEmail = body.from || body.email || '';\n    fromName = body.from_name || '';\n    subject = body.subject || '';\n    text = body.text || body.plain || '';\n    html = body.html || '';\n    messageId = body.message_id || body['message-id'] || '';\n    to = body.to || '';\n  }\n  // Mailgun format\n  else if (body.sender || body.recipient) {\n    fromEmail = body.sender || '';\n    fromName = body['From'] || '';\n    subject = body.subject || body['Subject'] || '';\n    text = body['body-plain'] || body['stripped-text'] || '';\n    html = body['body-html'] || body['stripped-html'] || '';\n    messageId = body['Message-Id'] || '';\n    to = body.recipient || '';\n  }\n  // Postmark format\n  else if (body.FromFull || body.From) {\n    const fromFull = body.FromFull || {};\n    fromEmail = fromFull.Email || body.From || '';\n    fromName = fromFull.Name || '';\n    subject = body.Subject || '';\n    text = body.TextBody || '';\n    html = body.HtmlBody || '';\n    messageId = body.MessageID || '';\n    to = body.To || '';\n  }\n  // CloudMailin / Generic format\n  else if (body.envelope) {\n    const envelope = body.envelope || {};\n    fromEmail = envelope.from || '';\n    subject = body.headers?.subject || '';\n    text = body.plain || body.text || '';\n    html = body.html || '';\n    messageId = body.headers?.['message-id'] || '';\n    to = envelope.to?.[0] || '';\n    fromName = body.headers?.from || '';\n  }\n  \n  // Extract text from HTML if no plain text\n  if (!text && html) {\n    text = html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n  }\n  \n  // Format payload for API\n  const payload = {\n    source: 'email',\n    text: text,\n    subject: subject || 'No Subject',\n    external_id: messageId || null,\n    contact: {\n      email: fromEmail,\n      name: fromName || null\n    },\n    meta: {\n      receivedAt: new Date().toISOString(),\n      to: to,\n      webhookProvider: body.provider || 'unknown',\n      rawData: body\n    }\n  };\n  \n  results.push({\n    json: {\n      payload: payload,\n      originalEmail: {\n        from: fromEmail,\n        subject: subject,\n        messageId: messageId\n      }\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "parse-webhook-002",
+      "name": "Parse Webhook Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SERVER_URL }}/api/inbound/email",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-to-server-003",
+      "name": "Send to Server",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        650,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-ok-001",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-success-004",
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ \n  success: true, \n  leadId: $json.leadId,\n  intent: $json.intent,\n  urgency: $json.urgency,\n  message: 'Email processed successfully'\n}) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "webhook-response-success-005",
+      "name": "Webhook Response - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1050,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ \n  success: false, \n  error: $json.error || 'Processing failed',\n  message: 'Failed to process email'\n}) }}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "webhook-response-error-006",
+      "name": "Webhook Response - Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1050,
+        400
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Incoming Email": {
+      "main": [
+        [
+          {
+            "node": "Parse Webhook Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Webhook Data": {
+      "main": [
+        [
+          {
+            "node": "Send to Server",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Server": {
+      "main": [
+        [
+          {
+            "node": "Check Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Success": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response - Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Webhook Response - Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "id": "inbox-pilot-email-webhook",
+  "meta": {
+    "instanceId": "your-n8n-instance-id"
+  },
+  "tags": []
+}
+

@@ -1,0 +1,105 @@
+version: "3.8"
+
+services:
+  # SvelteKit Application
+  inbox-pilot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PUBLIC_SUPABASE_URL: ${PUBLIC_SUPABASE_URL}
+        PUBLIC_SUPABASE_KEY: ${PUBLIC_SUPABASE_KEY}
+        PUBLIC_HF_BASE: ${PUBLIC_HF_BASE}
+        PUBLIC_HF_TOKEN: ${PUBLIC_HF_TOKEN}
+        SUPABASE_URL: ${SUPABASE_URL}
+        SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    container_name: inbox-pilot-app
+    ports:
+      - "5173:5173"
+    environment:
+      # Public environment variables (accessible in browser)
+      PUBLIC_SUPABASE_URL: ${PUBLIC_SUPABASE_URL}
+      PUBLIC_SUPABASE_KEY: ${PUBLIC_SUPABASE_KEY}
+      PUBLIC_HF_BASE: ${PUBLIC_HF_BASE}
+      PUBLIC_HF_TOKEN: ${PUBLIC_HF_TOKEN}
+
+      # Server-only environment variables
+      ORIGIN: http://localhost:5173
+      PORT: 5173
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    networks:
+      - inbox-pilot-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:5173/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # n8n Workflow Automation
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: inbox-pilot-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      # n8n Configuration
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+
+      # Custom environment variables for workflows
+      - SERVER_URL=http://inbox-pilot:5173
+
+      # Timezone (adjust as needed)
+      - GENERIC_TIMEZONE=America/New_York
+
+      # Database (uses SQLite by default, persisted in volume)
+      - DB_TYPE=sqlite
+
+      # Execute in main process for local development
+      - EXECUTIONS_PROCESS=main
+    volumes:
+      # Persist n8n data
+      - n8n-data:/home/node/.n8n
+
+      # Optional: Mount workflow files for easy import
+      # - ./n8n-email-workflow.json:/home/node/.n8n/workflows/email-workflow.json:ro
+    networks:
+      - inbox-pilot-network
+    restart: unless-stopped
+    depends_on:
+      - inbox-pilot
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:5678/healthz",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  inbox-pilot-network:
+    driver: bridge
+
+volumes:
+  n8n-data:
+    driver: local

@@ -26,6 +26,7 @@ type InboundBody = {
   text: string;
   contact?: InboundContact;
   meta?: unknown;
+  organization_id?: string | null;
 };
 
 async function findExistingLead(source: string, external_id: string) {
@@ -38,14 +39,15 @@ async function findExistingLead(source: string, external_id: string) {
   return data?.id as string | undefined;
 }
 
-async function createLead(input: { source: string; text: string; subject?: string | null; external_id?: string | null }) {
+async function createLead(input: { source: string; text: string; subject?: string | null; external_id?: string | null; org_id?: string | null }) {
   const { data, error } = await supabase
     .from('leads')
     .insert({
       source: input.source,
       raw_text: input.text,
       subject: input.subject ?? null,
-      external_id: input.external_id ?? null
+      external_id: input.external_id ?? null,
+      org_id: input.org_id ?? null
     })
     .select('id, created_at')
     .single();
@@ -67,7 +69,7 @@ async function updateLeadAI(leadId: string, ai: { intent: string; urgency: strin
   if (error) throw new Error(error.message);
 }
 
-async function upsertClient(c: InboundContact) {
+async function upsertClient(c: InboundContact, org_id?: string | null) {
   const email = normEmail(c.email);
   if (email) {
     const { data } = await supabase.from('clients').select('*').eq('email', email).maybeSingle();
@@ -80,7 +82,8 @@ async function upsertClient(c: InboundContact) {
       name: c.name ?? null,
       email,
       phone: c.phone ?? null,
-      company: c.company ?? null
+      company: c.company ?? null,
+      org_id: org_id ?? null
     })
     .select('id')
     .single();
@@ -93,7 +96,7 @@ async function linkLeadToClient(leadId: string, clientId: string) {
   if (error) throw new Error(error.message);
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     const body = (await request.json()) as InboundBody;
     const text = String(body.text ?? '');
@@ -106,13 +109,26 @@ export const POST: RequestHandler = async ({ request }) => {
     const external_id = body.external_id ?? null;
     const contact: InboundContact = body.contact ?? {};
 
+    // Get org_id from body, locals, or get default org
+    let org_id = body.organization_id || locals.orgId || null;
+
+    // If no org_id, try to get the first organization as default
+    if (!org_id) {
+      const { data: defaultOrg } = await supabase
+        .from('organizations')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+      org_id = defaultOrg?.id || null;
+    }
+
     let leadId: string | undefined;
     if (external_id) {
       leadId = await findExistingLead(source, external_id);
     }
 
     if (!leadId) {
-      leadId = await createLead({ source, text, subject, external_id });
+      leadId = await createLead({ source, text, subject, external_id, org_id });
     }
 
     const [intent, urg] = await Promise.all([classifyIntent(text), classifyUrgencyFull(text)]);
@@ -128,7 +144,7 @@ export const POST: RequestHandler = async ({ request }) => {
     let clientId: string | null = null;
     if (contact.email || contact.phone || contact.name || contact.company) {
       try {
-        clientId = await upsertClient(contact);
+        clientId = await upsertClient(contact, org_id);
         await linkLeadToClient(leadId, clientId);
       } catch (e) {
         console.warn('Client upsert/link failed:', e);

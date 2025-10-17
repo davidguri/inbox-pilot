@@ -125,22 +125,6 @@
 						</a>
 					{/if}
 				</div>
-
-				<!-- Stats -->
-				<div class="grid grid-cols-3 gap-8 pt-8 max-w-lg mx-auto lg:mx-0">
-					<div class="text-center lg:text-left">
-						<div class="text-3xl font-bold gradient-text">99%</div>
-						<div class="text-sm text-gray-500 mt-1">Accuracy</div>
-					</div>
-					<div class="text-center lg:text-left">
-						<div class="text-3xl font-bold gradient-text">50k+</div>
-						<div class="text-sm text-gray-500 mt-1">Users</div>
-					</div>
-					<div class="text-center lg:text-left">
-						<div class="text-3xl font-bold gradient-text">24/7</div>
-						<div class="text-sm text-gray-500 mt-1">Support</div>
-					</div>
-				</div>
 			</div>
 
 			<!-- Right side - Visual -->

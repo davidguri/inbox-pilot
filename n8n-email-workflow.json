@@ -1,0 +1,287 @@
+{
+  "name": "Inbox Pilot - Email Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "mailbox": "INBOX",
+        "postProcessAction": "read",
+        "options": {
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "d4c8a5e1-8b2f-4a1d-9c3e-7f5b8d2a4e6c",
+      "name": "Email Trigger (IMAP)",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "credentials": {
+        "imap": {
+          "id": "1",
+          "name": "IMAP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "a7b3c9d2-4e5f-8a1b-6c2d-9e3f7a5b8c4d",
+      "name": "Process Email Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        450,
+        300
+      ],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract email content and format for API\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  // Get email data\n  const from = item.json.from?.value?.[0] || item.json.from || {};\n  const fromEmail = from.address || from.email || '';\n  const fromName = from.name || '';\n  \n  // Get subject\n  const subject = item.json.subject || 'No Subject';\n  \n  // Get text content (prefer plain text, fallback to HTML)\n  let text = item.json.text || item.json.textPlain || '';\n  if (!text && item.json.html) {\n    // Strip HTML tags for basic text extraction\n    text = item.json.html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n  }\n  \n  // Get message ID for deduplication\n  const messageId = item.json.messageId || item.json.id || null;\n  \n  // Format payload for your API\n  const payload = {\n    source: 'email',\n    text: text,\n    subject: subject,\n    external_id: messageId,\n    contact: {\n      email: fromEmail,\n      name: fromName || null\n    },\n    meta: {\n      receivedAt: new Date().toISOString(),\n      to: item.json.to,\n      cc: item.json.cc,\n      date: item.json.date\n    }\n  };\n  \n  results.push({\n    json: {\n      payload: payload,\n      originalEmail: {\n        from: fromEmail,\n        subject: subject,\n        messageId: messageId\n      }\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "b8c4d5e2-9f3a-6b1c-7d4e-8a2f5b9c3e6d",
+      "name": "Format API Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SERVER_URL }}/api/inbound/email",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "source",
+              "value": "={{ $json.payload.source }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.payload.text }}"
+            },
+            {
+              "name": "subject",
+              "value": "={{ $json.payload.subject }}"
+            },
+            {
+              "name": "external_id",
+              "value": "={{ $json.payload.external_id }}"
+            },
+            {
+              "name": "contact",
+              "value": "={{ $json.payload.contact }}"
+            },
+            {
+              "name": "meta",
+              "value": "={{ $json.payload.meta }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "c9d5e3f1-7a2b-8c4d-9e5f-6b3a7c8d4e9f",
+      "name": "Send to Server",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        850,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d1e2f3a4-b5c6-d7e8-f9a0-b1c2d3e4f5a6",
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "e2f3a4b5-c6d7-e8f9-a0b1-c2d3e4f5a6b7",
+      "name": "Success - Log Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        1250,
+        200
+      ],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Optional: Additional logging or operations\n-- The server already saved everything to Supabase\nSELECT \n  '{{ $json.leadId }}' as lead_id,\n  '{{ $json.intent }}' as intent,\n  '{{ $json.urgency }}' as urgency,\n  '{{ $json.urgency_score }}' as urgency_score,\n  NOW() as processed_at;",
+        "options": {}
+      },
+      "id": "f3a4b5c6-d7e8-f9a0-b1c2-d3e4f5a6b7c8",
+      "name": "Optional Supabase Log",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        1450,
+        200
+      ],
+      "disabled": true,
+      "credentials": {
+        "postgres": {
+          "id": "3",
+          "name": "Supabase PostgreSQL"
+        }
+      },
+      "notes": "This node is disabled by default since your server already handles all Supabase operations"
+    },
+    {
+      "parameters": {
+        "errorMessage": "=Failed to process email: {{ $json.error }}\nSubject: {{ $('Format API Payload').item.json.originalEmail.subject }}\nFrom: {{ $('Format API Payload').item.json.originalEmail.from }}"
+      },
+      "id": "a4b5c6d7-e8f9-a0b1-c2d3-e4f5a6b7c8d9",
+      "name": "Error - Stop and Report",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        400
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Email Trigger (IMAP)": {
+      "main": [
+        [
+          {
+            "node": "Process Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Email Data": {
+      "main": [
+        [
+          {
+            "node": "Format API Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format API Payload": {
+      "main": [
+        [
+          {
+            "node": "Send to Server",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Server": {
+      "main": [
+        [
+          {
+            "node": "Check Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Success": {
+      "main": [
+        [
+          {
+            "node": "Success - Log Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error - Stop and Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success - Log Result": {
+      "main": [
+        [
+          {
+            "node": "Optional Supabase Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "id": "inbox-pilot-email-workflow",
+  "meta": {
+    "instanceId": "your-n8n-instance-id"
+  },
+  "tags": []
+}

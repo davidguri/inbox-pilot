@@ -275,7 +275,7 @@
 					</svg>
 				</div>
 			</div>
-			<div class="gradient-text mb-1 text-2xl font-bold">247</div>
+			<div class="gradient-text mb-1 text-2xl font-bold">67</div>
 			<p class="text-xs text-gray-500">Unprocessed emails</p>
 		</div>
 
