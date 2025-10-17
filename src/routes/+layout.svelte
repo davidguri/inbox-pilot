@@ -19,54 +19,99 @@
 
 	let navigation = ["dashboard", "clients", "contracts", "leads", "settings"];
 
-	function handleLogout() {
-		// Clear cookies and redirect to home
-		document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-		document.cookie = 'sb-refresh-token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-		goto('/');
+	async function handleLogout() {
+		try {
+			// Call logout API endpoint to properly sign out server-side
+			const response = await fetch('/api/logout', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			});
+
+			if (response.ok) {
+				// API logout successful, redirect to home
+				goto('/');
+			} else {
+				// Fallback: if API fails, still redirect (cookies might still be cleared)
+				console.error('Logout API failed:', await response.text());
+				goto('/');
+			}
+		} catch (error) {
+			// Fallback: if fetch fails, still redirect
+			console.error('Logout request failed:', error);
+			goto('/');
+		}
 	}
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
 	<title>InboxPilot</title>
+	<style>
+		body {
+			background: #05050a;
+			color: #fafafa;
+			margin: 0;
+			padding: 0;
+			overflow-x: hidden;
+		}
+		html, body {
+			height: 100%;
+			width: 100%;
+		}
+	</style>
 </svelte:head>
 
 {#if isProtectedRoute && !isAuthenticated}
 	<!-- Show loading while checking auth -->
-	<div class="flex items-center justify-center h-screen">
+	<div class="flex items-center justify-center h-screen w-screen modern-hero">
 		<div class="text-center">
-			<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-			<p class="text-gray-600">Checking authentication...</p>
+			<div class="relative mx-auto mb-6">
+				<div class="animate-spin rounded-full h-16 w-16 border-4 border-purple-400 border-t-purple-600"></div>
+				<div class="absolute inset-0 h-16 w-16 animate-pulse rounded-full bg-gradient-to-r from-purple-400 to-cyan-500 opacity-20"></div>
+			</div>
+			<p class="text-gray-300 font-medium">Checking authentication...</p>
 		</div>
 	</div>
 {:else if isProtectedRoute}
 	<!-- Protected layout with sidebar -->
-	<div class="flex flex-row h-screen font-sans">
+	<div class="flex flex-row h-screen w-screen font-sans">
 		<Sidebar {navigation} />
-		<main class="flex-1 overflow-hidden">
+		<main class="flex-1 flex flex-col overflow-hidden">
 			<!-- Header with user info and logout -->
-			<header class="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+			<header class="modern-nav px-6 py-4 flex-shrink-0">
 				<div class="flex items-center justify-between">
 					<div class="flex items-center space-x-4">
-						<h1 class="text-xl font-semibold text-gray-900">Dashboard</h1>
+						<div class="h-8 w-8 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-lg flex items-center justify-center glow-primary">
+							<svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+							</svg>
+						</div>
+						<h1 class="text-xl font-bold text-white modern-heading">Dashboard</h1>
 					</div>
 
 					<div class="flex items-center space-x-4">
-						<div class="text-sm text-gray-600">
-							Welcome, {$page.data.user?.email}
+						<div class="flex items-center space-x-2 modern-card px-3 py-2">
+							<div class="h-2 w-2 bg-green-400 rounded-full animate-pulse"></div>
+							<div class="text-sm text-gray-300 font-medium">
+								Welcome, {$page.data.user?.email}
+							</div>
 						</div>
 						<button
 							on:click={handleLogout}
-							class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+							class="inline-flex items-center px-4 py-2 btn-primary text-sm leading-4 font-medium transition-all duration-200"
 						>
+							<svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+							</svg>
 							Sign Out
 						</button>
 					</div>
 				</div>
 			</header>
 
-			<div class="flex-1 p-6 overflow-y-auto">
+			<div class="flex-1 p-6 overflow-y-auto bg-gradient-to-br from-gray-900 via-gray-900 to-black w-full">
 				{@render children()}
 			</div>
 		</main>

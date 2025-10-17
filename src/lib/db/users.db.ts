@@ -1,4 +1,4 @@
-import { supabase } from '../../supabase/supabase';
+import { supabase } from '$lib/supabase/supabase';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 

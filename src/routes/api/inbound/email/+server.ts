@@ -1,7 +1,7 @@
 // src/routes/api/inbound/email/+server.ts
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
-import { supabase } from '../../../../supabase/supabase';
+import { supabase } from '$lib/supabase/supabase';
 import { classifyIntent } from '../../../../lib/api/classify.api';
 import { classifyUrgencyFull } from '../../../../lib/api/sentiment.api';
 import { normEmail } from '$lib/utils/normalize.util';

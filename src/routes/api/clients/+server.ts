@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { supabase } from '../../../supabase/supabase';
+import { supabase } from '$lib/supabase/supabase';
 
 export const GET: RequestHandler = async ({ url }) => {
   try {

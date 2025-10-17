@@ -3,6 +3,8 @@ import { json } from '@sveltejs/kit';
 
 import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL } from '$env/static/private';
 import { createClient } from '@supabase/supabase-js';
+
+// Create Supabase admin client for server-side operations
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: true } });
 
 // Minimal inline versions (avoid importing client-side modules)

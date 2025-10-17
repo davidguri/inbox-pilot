@@ -1,4 +1,4 @@
-import { supabase } from '../../supabase/supabase';
+import { supabase } from '$lib/supabase/supabase';
 import { hf } from '../api/hf.api';
 import { Labels } from '../api/classify.api';
 import { Urgency, Sentiment } from '../api/sentiment.api';

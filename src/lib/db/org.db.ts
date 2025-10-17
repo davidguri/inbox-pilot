@@ -1,4 +1,4 @@
-import { supabase } from '../../supabase/supabase';
+import { supabase } from '$lib/supabase/supabase';
 import { slugify } from '$lib/utils/slugify.util';
 
 export type OrgRow = {

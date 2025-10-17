@@ -1,7 +1,6 @@
 <script lang="ts">
 	import Widget from '$lib/components/Widget.svelte';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
 
 	let loading = true;
 	let error: string | null = null;
@@ -15,24 +14,25 @@
 	} | null = null;
 
 	let clients: any[] = [];
+	let lastLoadedOrgId: string | undefined = undefined;
 
-	// Get org_id from page data or URL params
-	const orgId = $page.url.searchParams.get('org_id') || 'default-org';
+	// Get org_id from page data
+	$: orgId = $page.data.orgId;
 
-	async function loadData() {
+	async function loadData(currentOrgId: string) {
 		try {
 			loading = true;
 			error = null;
 
 			// Fetch dashboard stats
-			const statsResponse = await fetch(`/api/dashboard/stats?org_id=${orgId}`);
+			const statsResponse = await fetch(`/api/dashboard/stats?org_id=${currentOrgId}`);
 			if (!statsResponse.ok) {
 				throw new Error(`Failed to fetch stats: ${statsResponse.statusText}`);
 			}
 			stats = await statsResponse.json();
 
 			// Fetch clients list
-			const clientsResponse = await fetch(`/api/clients?org_id=${orgId}&limit=10`);
+			const clientsResponse = await fetch(`/api/clients?org_id=${currentOrgId}&limit=10`);
 			if (clientsResponse.ok) {
 				const clientsData = await clientsResponse.json();
 				clients = clientsData.clients || [];
@@ -45,9 +45,14 @@
 		}
 	}
 
-	onMount(() => {
-		loadData();
-	});
+	// Only reload when orgId changes
+	$: if (orgId && orgId !== lastLoadedOrgId) {
+		lastLoadedOrgId = orgId;
+		loadData(orgId);
+	} else if (!orgId) {
+		error = 'No organization ID found';
+		loading = false;
+	}
 </script>
 
 <main>

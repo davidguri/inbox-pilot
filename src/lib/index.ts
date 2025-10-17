@@ -4,3 +4,4 @@ import './utils/slugify.util.ts';
 import './db/users.db.ts';
 import './db/org.db.ts';
 import './drafts/reply.draft.ts';
+import './supabase/supabase.ts';

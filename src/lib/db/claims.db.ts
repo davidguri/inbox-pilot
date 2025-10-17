@@ -1,4 +1,4 @@
-import { supabase } from '../../supabase/supabase';
+import { supabase } from '$lib/supabase/supabase';
 
 export type ClaimStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 
