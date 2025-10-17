@@ -71,11 +71,17 @@ async function updateLeadAI(leadId: string, ai: { intent: string; urgency: strin
 
 async function upsertClient(c: InboundContact, org_id?: string | null) {
   const email = normEmail(c.email);
+
+  // Check if client already exists by email
   if (email) {
-    const { data } = await supabase.from('clients').select('*').eq('email', email).maybeSingle();
-    if (data) return data.id as string;
+    const { data } = await supabase.from('clients').select('id').eq('email', email).maybeSingle();
+    if (data) {
+      // Return existing client's ID
+      return data.id as string;
+    }
   }
 
+  // Create new client if not found
   const { data, error } = await supabase
     .from('clients')
     .insert({
@@ -109,18 +115,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     const external_id = body.external_id ?? null;
     const contact: InboundContact = body.contact ?? {};
 
-    // Get org_id from body, locals, or get default org
-    let org_id = body.organization_id || locals.orgId || null;
-
-    // If no org_id, try to get the first organization as default
-    if (!org_id) {
-      const { data: defaultOrg } = await supabase
-        .from('organizations')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-      org_id = defaultOrg?.id || null;
-    }
+    // Get org_id from body, locals, or use default org
+    let org_id = body.organization_id || locals.orgId || '285e8ad6-d67d-4530-941d-efbf637a0cf9';
 
     let leadId: string | undefined;
     if (external_id) {
