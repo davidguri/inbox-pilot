@@ -331,7 +331,7 @@
 					</svg>
 				</div>
 			</div>
-			<div class="gradient-text mb-1 text-2xl font-bold">1,247</div>
+			<div class="gradient-text mb-1 text-2xl font-bold">487</div>
 			<div class="text-xs text-gray-500">This month</div>
 			<div class="mt-3 flex items-center text-xs text-green-400">
 				<svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
